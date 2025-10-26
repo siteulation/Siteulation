@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Studio</h1>
+  <p class="muted">Describe the website you want. We'll generate a complete, self-contained HTML file.</p>
+  <form id="gen-form" class="form">
+    <label>
+      <span>Title</span>
+      <input id="title" name="title" required maxlength="120" placeholder="My Awesome Site">
+    </label>
+    <label>
+      <span>Slug (optional)</span>
+      <input id="slug" name="slug" maxlength="50" placeholder="my-awesome-site">
+    </label>
+    <label>
+      <span>Prompt</span>
+      <textarea id="prompt" name="prompt" rows="8" required placeholder="Explain what the site should do, sections, interactions, etc."></textarea>
+    </label>
+    <button class="btn" type="submit">Generate</button>
+  </form>
+  <div id="result" class="result" hidden>
+    <p>Done! View your site:</p>
+    <p><a id="site-link" href="#" class="btn">Open site</a></p>
+  </div>
+  <script type="module" src="{{ url_for('static', filename='studio.js') }}"></script>
+{% endblock %}
+

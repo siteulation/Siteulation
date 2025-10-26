@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Most viewed projects</h1>
+  {% if projects|length == 0 %}
+    <p class="muted">No projects yet. Sign up and create your first site in the Studio.</p>
+  {% else %}
+    <div class="grid">
+      {% for p in projects %}
+      <a class="card" href="/@{{ p['username'] }}/{{ p['slug'] }}">
+        <div class="card-body">
+          <h3>{{ p['title'] }}</h3>
+          <p class="muted">by @{{ p['username'] }}</p>
+        </div>
+        <div class="card-meta">
+          <span>{{ p['views'] }} views</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% extends "base.html" %}
+{% block content %}
+  <h1>Most viewed projects</h1>
+  {% if projects|length == 0 %}
+    <p class="muted">No projects yet. Sign up and create your first site in the Studio.</p>
+  {% else %}
+    <div class="grid">
+      {% for p in projects %}
+      <a class="card" href="/@{{ p['username'] }}/{{ p['slug'] }}">
+        <div class="card-body">
+          <h3>{{ p['title'] }}</h3>
+          <p class="muted">by @{{ p['username'] }}</p>
+        </div>
+        <div class="card-meta">
+          <span>{{ p['views'] }} views</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
+
