@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>siteulation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container row">
+      <a class="brand" href="/">siteulation</a>
+      <nav class="nav">
+        <a href="/studio">Studio</a>
+        <a href="/login">Log in</a>
+        <a class="btn" href="/signup">Sign up</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Most viewed projects</h1>
+    <p id="empty" class="muted" style="display:none">No projects yet. Sign up and create your first site in the Studio.</p>
+    <div id="grid" class="grid" aria-live="polite"></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; siteulation — Build sites with AI.</p>
+    </div>
+  </footer>
+
+  <script type="module">
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+
+    function card(p) {
+      const a = document.createElement('a');
+      a.className = 'card';
+      a.href = `/@${p.username}/${p.slug}`;
+      a.innerHTML = `
+        <div class="card-body">
+          <h3>${escapeHtml(p.title)}</h3>
+          <p class="muted">by @${escapeHtml(p.username)}</p>
+        </div>
+        <div class="card-meta">
+          <span>${Number(p.views || 0)} views</span>
+        </div>
+      `;
+      return a;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/projects');
+        if (!res.ok) throw new Error('Failed to load projects');
+        const data = await res.json();
+        const projects = data.projects || [];
+        if (projects.length === 0) {
+          empty.style.display = 'block';
+          return;
+        }
+        const frag = document.createDocumentFragment();
+        projects.forEach(p => frag.appendChild(card(p)));
+        grid.appendChild(frag);
+      } catch (e) {
+        empty.textContent = 'Unable to load projects. Please try again later.';
+        empty.style.display = 'block';
+        console.error(e);
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
+
