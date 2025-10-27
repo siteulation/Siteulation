@@ -4,6 +4,18 @@ const state = {
 // Add API base override (set window.SITEULATION_API = 'https://your-backend.example.com' in HTML if needed)
 const API_BASE = typeof window !== "undefined" && window.SITEULATION_API ? window.SITEULATION_API.replace(/\/$/, "") : "";
 
+// Persist current user locally (no passwords)
+const USER_KEY = "siteulation.currentUser";
+function readLocalUser() {
+  try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; }
+}
+function writeLocalUser(u) {
+  if (!u) localStorage.removeItem(USER_KEY);
+  else localStorage.setItem(USER_KEY, JSON.stringify(u));
+}
+// Initialize from local cache for instant nav rendering
+state.currentUser = readLocalUser();
+
 function setTitle(t) {
   document.title = t ? `${t} – siteulation` : "siteulation";
 }
@@ -288,11 +300,14 @@ async function loadSession() {
     if (res.ok) {
       const data = await res.json();
       state.currentUser = data.user;
+      if (state.currentUser) writeLocalUser(state.currentUser);
+      else writeLocalUser(null);
     } else {
-      state.currentUser = null;
+      state.currentUser = readLocalUser(); // keep local if server unreachable
     }
   } catch {
-    state.currentUser = null;
+    // Network error: fall back to local cache
+    state.currentUser = readLocalUser();
   }
 }
 
@@ -306,7 +321,14 @@ function renderNav() {
     <a data-link href="/login">Log in</a>
     <a class="btn" data-link href="/signup">Sign up</a>
   `;
-  const f = nav.querySelector("#logout-form"); if (f) f.addEventListener("submit", async (e) => { e.preventDefault(); await fetch(`${API_BASE}/logout`, { method:"POST", credentials:"include"}); await loadSession(); renderNav(); navigateTo("/", true); });
+  const f = nav.querySelector("#logout-form"); if (f) f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    writeLocalUser(null);
+    await fetch(`${API_BASE}/logout`, { method:"POST", credentials:"include"});
+    await loadSession();
+    renderNav();
+    navigateTo("/", true);
+  });
 }
 
 async function router() {
@@ -319,6 +341,7 @@ async function router() {
 
 attachGlobalLinkInterceptor();
 window.addEventListener("popstate", router);
+renderNav();
 await loadSession();
 renderNav();
 router();
