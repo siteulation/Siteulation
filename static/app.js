@@ -3,6 +3,8 @@ const state = {
   projects: [],
   currentUser: null
 };
+// Add API base override (set window.SITEULATION_API = 'https://your-backend.example.com' in HTML if needed)
+const API_BASE = typeof window !== "undefined" && window.SITEULATION_API ? window.SITEULATION_API.replace(/\/$/, "") : "";
 
 // Storage helpers
 const storeKey = "siteulation_store_v1";
@@ -141,7 +143,7 @@ route("/", async (el) => {
   // Try server projects first, fallback to local
   let projects = [];
   try {
-    const res = await fetch("/api/projects", { headers: { "Accept": "application/json" } });
+    const res = await fetch(`${API_BASE}/api/projects`, { headers: { "Accept": "application/json" } });
     if (res.ok) {
       const data = await res.json();
       projects = data.projects || [];
@@ -301,15 +303,16 @@ route("/studio", async (el) => {
     // Try server API first
     let serverOk = false;
     try {
-      const res = await fetch("/api/generate", {
+      const res = await fetch(`${API_BASE}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, slug, prompt })
+        body: JSON.stringify({ title, slug, prompt }),
+        credentials: "include"
       });
       if (res.ok) {
         const data = await res.json();
-        link.href = data.url;
-        link.textContent = data.url;
+        link.href = data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
+        link.textContent = link.href;
         result.hidden = false;
         serverOk = true;
       }
@@ -398,7 +401,8 @@ route(/^\/@(?<username>[A-Za-z0-9_]{3,20})\/(?<slug>[a-z0-9\-]{1,50})$/, async (
   // Try server page first
   let servedByServer = false;
   try {
-    const res = await fetch(window.location.pathname, { method: "GET" });
+    const url = `${API_BASE}/@${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
+    const res = await fetch(url, { method: "GET" });
     if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
       const html = await res.text();
       el.innerHTML = `
