@@ -8,51 +8,35 @@ function setTitle(t) {
   document.title = t ? `${t} – siteulation` : "siteulation";
 }
 
-// Router infra unchanged
-// ... existing code ...
-function renderNav() {
-  const nav = document.getElementById("nav");
-  if (!nav) return;
-  if (state.currentUser) {
-    nav.innerHTML = `
-      <a data-link href="/studio">Studio</a>
-      <a data-link href="/@${encodeURIComponent(state.currentUser.username)}">Profile</a>
-      <button class="btn" id="logout-btn" type="button">Logout</button>
-    `;
-    nav.querySelector("#logout-btn").addEventListener("click", async () => {
-      try {
-        await fetch(`${API_BASE}/logout`, { method: "POST", credentials: "include" });
-      } catch {}
-      state.currentUser = null;
-      await loadSession();
-      navigateTo("/");
-    });
-  } else {
-    nav.innerHTML = `
-      <a data-link href="/studio">Studio</a>
-      <a data-link href="/login">Log in</a>
-      <a class="btn" data-link href="/signup">Sign up</a>
-    `;
-  }
+// Router infra
+const routes = [];
+function route(pattern, handler) {
+  routes.push({ pattern, handler });
 }
-// ... existing code ...
-async function router() {
-  renderNav();
-  const app = document.getElementById("app");
-  const pathname = window.location.pathname;
-  const matched = matchRoute(pathname);
-  if (!matched) {
-    setTitle("Not found");
-    app.innerHTML = `
-      <h1>Not found</h1>
-      <p class="muted">The page you're looking for doesn't exist.</p>
-      <p><a class="btn" data-link href="/">Go home</a></p>
-    `;
-    attachLinkHandlers(app);
-    return;
+
+function matchRoute(path) {
+  for (const r of routes) {
+    if (typeof r.pattern === "string" && r.pattern === path) {
+      return { handler: r.handler, params: {} };
+    }
+    if (r.pattern instanceof RegExp) {
+      const m = path.match(r.pattern);
+      if (m) {
+        return { handler: r.handler, params: m.groups || {} };
+      }
+    }
   }
-  await matched.handler(app, matched.params);
-  attachLinkHandlers(app);
+  return null;
+}
+
+async function navigateTo(href, replace = false) {
+  const url = new URL(href, location.origin);
+  (replace ? history.replaceState : history.pushState).call(history, {}, '', url.pathname);
+  await router();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // Link interception
@@ -310,6 +294,27 @@ async function loadSession() {
   } catch {
     state.currentUser = null;
   }
+}
+
+function renderNav() {
+  const nav = document.getElementById("nav"); if (!nav) return;
+  nav.innerHTML = state.currentUser ? `
+    <a data-link href="/studio">Studio</a>
+    <a data-link href="/@${encodeURIComponent(state.currentUser.username)}">Profile</a>
+    <form class="inline" id="logout-form"><button class="btn" type="submit">Logout</button></form>
+  ` : `
+    <a data-link href="/login">Log in</a>
+    <a class="btn" data-link href="/signup">Sign up</a>
+  `;
+  const f = nav.querySelector("#logout-form"); if (f) f.addEventListener("submit", async (e) => { e.preventDefault(); await fetch(`${API_BASE}/logout`, { method:"POST", credentials:"include"}); await loadSession(); renderNav(); navigateTo("/", true); });
+}
+
+async function router() {
+  const el = document.getElementById("app");
+  const m = matchRoute(location.pathname);
+  if (!m) { setTitle("Not found"); el.innerHTML = "<h1>Not found</h1>"; return; }
+  await m.handler(el, m.params || {});
+  attachLinkHandlers(el);
 }
 
 attachGlobalLinkInterceptor();
