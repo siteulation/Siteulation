@@ -170,19 +170,8 @@ def gemini_generate_html(prompt: str) -> str:
 ###############################################################################
 @app.route("/")
 def home():
-    # Render the homepage from the template with server-side project data
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-      SELECT username, slug, title, views, created_at
-      FROM projects
-      ORDER BY views DESC, created_at DESC
-      LIMIT 24
-    """)
-    rows = c.fetchall()
-    conn.close()
-    projects = rows
-    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects)
+    # Serve the static root index.html file directly
+    return send_from_directory(BASE_DIR, "index.html")
 
 @app.route("/api/projects")
 def api_projects():
@@ -229,6 +218,7 @@ def signup():
         session["user_id"] = row["id"]
         flash("Welcome to siteulation!", "success")
         return redirect(url_for("studio"))
+    # GET: render the signup page
     return render_template("signup.html", app_name=APP_NAME, user=current_user())
 
 @app.route("/login", methods=["GET", "POST"])
@@ -247,6 +237,7 @@ def login():
             return redirect(url_for("studio"))
         flash("Invalid credentials.", "error")
         return redirect(url_for("login"))
+    # GET: render the login page
     return render_template("login.html", app_name=APP_NAME, user=current_user())
 
 @app.route("/logout", methods=["POST"])
@@ -259,6 +250,7 @@ def logout():
 def studio():
     if not current_user():
         return redirect(url_for("login"))
+    # GET: render the studio page
     return render_template("studio.html", app_name=APP_NAME, user=current_user())
 
 @app.route("/api/generate", methods=["POST"])
