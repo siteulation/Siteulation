@@ -24,8 +24,8 @@ DB_URL = os.environ.get("DBURL")  # Render Postgres internal URL
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = SECRET_KEY
-# Enable CORS for API endpoints (allow static site to call this server)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Enable CORS for all endpoints with credentials (static site can call this server)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configure Gemini if available
 if GEMINI_API_KEY:
@@ -205,6 +205,13 @@ def api_projects():
         rows = c.fetchall()
     projects = [dict(r) for r in rows]
     return {"projects": projects}
+
+@app.route("/api/me", methods=["GET"])
+def api_me():
+    u = current_user()
+    if not u:
+        return {"user": None}
+    return {"user": {"id": u["id"], "username": u["username"]}}
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
