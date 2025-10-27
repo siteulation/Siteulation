@@ -1,69 +1,15 @@
 const state = {
-  users: [],
-  projects: [],
   currentUser: null
 };
 // Add API base override (set window.SITEULATION_API = 'https://your-backend.example.com' in HTML if needed)
 const API_BASE = typeof window !== "undefined" && window.SITEULATION_API ? window.SITEULATION_API.replace(/\/$/, "") : "";
 
-// Storage helpers
-const storeKey = "siteulation_store_v1";
-function loadStore() {
-  try {
-    const raw = localStorage.getItem(storeKey);
-    if (raw) {
-      const data = JSON.parse(raw);
-      state.users = data.users || [];
-      state.projects = data.projects || [];
-      state.currentUser = data.currentUser || null;
-    }
-  } catch {}
-}
-function saveStore() {
-  localStorage.setItem(storeKey, JSON.stringify({
-    users: state.users,
-    projects: state.projects,
-    currentUser: state.currentUser
-  }));
+function setTitle(t) {
+  document.title = t ? `${t} – siteulation` : "siteulation";
 }
 
-// Basic utils
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-function slugify(s) {
-  return (s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\-]+/g, "-")
-    .replace(/\-+/g, "-")
-    .replace(/^\-|\-$/g, "")
-    .slice(0, 50) || "site";
-}
-
-// Router
-const routes = [];
-function route(path, handler) {
-  routes.push({ path, handler });
-}
-function matchRoute(pathname) {
-  // Patterns in order of specificity
-  for (const r of routes) {
-    if (typeof r.path === "string" && r.path === pathname) {
-      return { handler: r.handler, params: {} };
-    }
-    if (r.path instanceof RegExp) {
-      const m = pathname.match(r.path);
-      if (m) return { handler: r.handler, params: m.groups || {} };
-    }
-  }
-  return null;
-}
+// Router infra unchanged
+// ... existing code ...
 function renderNav() {
   const nav = document.getElementById("nav");
   if (!nav) return;
@@ -73,9 +19,12 @@ function renderNav() {
       <a data-link href="/@${encodeURIComponent(state.currentUser.username)}">Profile</a>
       <button class="btn" id="logout-btn" type="button">Logout</button>
     `;
-    nav.querySelector("#logout-btn").addEventListener("click", () => {
+    nav.querySelector("#logout-btn").addEventListener("click", async () => {
+      try {
+        await fetch(`${API_BASE}/logout`, { method: "POST", credentials: "include" });
+      } catch {}
       state.currentUser = null;
-      saveStore();
+      await loadSession();
       navigateTo("/");
     });
   } else {
@@ -86,21 +35,13 @@ function renderNav() {
     `;
   }
 }
-function setTitle(t) {
-  document.title = t ? `${t} – siteulation` : "siteulation";
-}
-async function navigateTo(url, replace = false) {
-  if (replace) history.replaceState(null, "", url);
-  else history.pushState(null, "", url);
-  await router();
-}
+// ... existing code ...
 async function router() {
   renderNav();
   const app = document.getElementById("app");
   const pathname = window.location.pathname;
   const matched = matchRoute(pathname);
   if (!matched) {
-    // 404 view
     setTitle("Not found");
     app.innerHTML = `
       <h1>Not found</h1>
@@ -140,29 +81,14 @@ function attachLinkHandlers(scope = document) {
 // Views
 route("/", async (el) => {
   setTitle("");
-  // Try server projects first, fallback to local
   let projects = [];
   try {
-    const res = await fetch(`${API_BASE}/api/projects`, { headers: { "Accept": "application/json" } });
+    const res = await fetch(`${API_BASE}/api/projects`, { headers: { "Accept": "application/json" }, credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       projects = data.projects || [];
     }
-  } catch {
-    // ignore
-  }
-  if (!projects.length) {
-    projects = state.projects
-      .slice()
-      .sort((a, b) => (b.views || 0) - (a.views || 0))
-      .slice(0, 24)
-      .map(p => ({
-        username: p.username,
-        slug: p.slug,
-        title: p.title,
-        views: p.views || 0
-      }));
-  }
+  } catch { /* ignore */ }
   el.innerHTML = `
     <h1>Most viewed projects</h1>
     ${projects.length === 0 ? `
@@ -203,19 +129,24 @@ route("/login", async (el) => {
     </form>
     <p class="muted">No account? <a data-link href="/signup">Sign up</a></p>
   `;
-  el.querySelector("#login-form").addEventListener("submit", (e) => {
+  el.querySelector("#login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const username = (fd.get("username") || "").toString().trim();
-    const password = (fd.get("password") || "").toString();
-    const user = state.users.find(u => u.username === username);
-    if (!user || user.password !== password) {
-      alert("Invalid credentials.");
-      return;
+    try {
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        body: fd,
+        credentials: "include"
+      });
+      if (res.ok) {
+        await loadSession();
+        navigateTo("/studio");
+      } else {
+        alert("Invalid credentials.");
+      }
+    } catch {
+      alert("Network error.");
     }
-    state.currentUser = { id: user.id, username: user.username };
-    saveStore();
-    navigateTo("/studio");
   });
 });
 
@@ -237,24 +168,24 @@ route("/signup", async (el) => {
     </form>
     <p class="muted">Already have an account? <a data-link href="/login">Log in</a></p>
   `;
-  el.querySelector("#signup-form").addEventListener("submit", (e) => {
+  el.querySelector("#signup-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const username = (fd.get("username") || "").toString().trim();
-    const password = (fd.get("password") || "").toString();
-    if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
-      alert("Username must be 3-20 chars (letters, numbers, underscore).");
-      return;
+    try {
+      const res = await fetch(`${API_BASE}/signup`, {
+        method: "POST",
+        body: fd,
+        credentials: "include"
+      });
+      if (res.ok) {
+        await loadSession();
+        navigateTo("/studio");
+      } else {
+        alert("Signup failed.");
+      }
+    } catch {
+      alert("Network error.");
     }
-    if (state.users.some(u => u.username === username)) {
-      alert("Username is already taken.");
-      return;
-    }
-    const user = { id: crypto.randomUUID(), username, password, createdAt: new Date().toISOString() };
-    state.users.push(user);
-    state.currentUser = { id: user.id, username: user.username };
-    saveStore();
-    navigateTo("/studio");
   });
 });
 
@@ -291,101 +222,60 @@ route("/studio", async (el) => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
-    const title = (fd.get("title") || "").toString().trim();
-    const prompt = (fd.get("prompt") || "").toString().trim();
-    const slugIn = (fd.get("slug") || "").toString().trim();
-    const slug = slugify(slugIn || title);
-    if (!title || !prompt) {
+    const payload = {
+      title: (fd.get("title") || "").toString().trim(),
+      slug: (fd.get("slug") || "").toString().trim(),
+      prompt: (fd.get("prompt") || "").toString().trim()
+    };
+    if (!payload.title || !payload.prompt) {
       alert("Please fill in title and prompt.");
       return;
     }
-
-    // Try server API first
-    let serverOk = false;
+    form.querySelector('button[type="submit"]').disabled = true;
     try {
       const res = await fetch(`${API_BASE}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, slug, prompt }),
+        body: JSON.stringify(payload),
         credentials: "include"
       });
-      if (res.ok) {
-        const data = await res.json();
-        link.href = data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
-        link.textContent = link.href;
-        result.hidden = false;
-        serverOk = true;
-      }
-    } catch { /* ignore */ }
-
-    if (!serverOk) {
-      // Local fallback: generate simple placeholder HTML
-      const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(title)}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    :root { --fg:#111; --bg:#fff; --muted:#666; --border:#ebebeb; }
-    * { box-sizing: border-box; }
-    body { margin:0; color:var(--fg); background:var(--bg); font-family:"Noto Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height:1.5; }
-    header { padding:20px; border-bottom:1px solid var(--border); }
-    main { max-width:900px; margin:20px auto; padding:0 16px; }
-    .muted { color:var(--muted); }
-    .btn { display:inline-block; border:1px solid var(--fg); padding:8px 12px; border-radius:8px; text-decoration:none; color:inherit; }
-  </style>
-</head>
-<body>
-  <header><h1>${escapeHtml(title)}</h1><p class="muted">Generated locally. Prompt preview: ${escapeHtml(prompt.slice(0, 140))}</p></header>
-  <main>
-    <p>This project was created without a running server; content is stored in your browser.</p>
-    <p><a class="btn" href="/">Back to siteulation</a></p>
-  </main>
-</body>
-</html>`;
-      // store project locally
-      const username = state.currentUser.username;
-      if (state.projects.some(p => p.username === username && p.slug === slug)) {
-        alert("Slug already exists for your account.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error || "Generation failed");
         return;
       }
-      state.projects.push({
-        id: crypto.randomUUID(),
-        userId: state.currentUser.id,
-        username,
-        title,
-        slug,
-        html,
-        views: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      saveStore();
-      const url = `/@${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
+      const url = data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
       link.href = url;
       link.textContent = url;
       result.hidden = false;
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    } catch {
+      alert("Network error.");
+    } finally {
+      form.querySelector('button[type="submit"]').disabled = false;
     }
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   });
 });
 
 route(/^\/@(?<username>[A-Za-z0-9_]{3,20})$/, async (el, { username }) => {
   setTitle(`@${username}`);
-  // Try server profile if available (no-op on static)
-  // Fallback to local
-  const projects = state.projects
-    .filter(p => p.username === username)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  // Render server-backed profile page via simple list using /api/projects (already includes username on items)
+  let userProjects = [];
+  try {
+    const res = await fetch(`${API_BASE}/api/projects`, { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json();
+      userProjects = (data.projects || []).filter(p => p.username === username);
+    }
+  } catch {}
   el.innerHTML = `
     <h1>@${escapeHtml(username)}</h1>
     <h2 class="sub">Projects</h2>
-    ${projects.length === 0 ? `
+    ${userProjects.length === 0 ? `
       <p class="muted">No projects yet.</p>
     ` : `
       <ul class="list">
-        ${projects.map(p => `
+        ${userProjects.map(p => `
           <li>
             <a data-link href="/@${encodeURIComponent(username)}/${encodeURIComponent(p.slug)}"><strong>${escapeHtml(p.title)}</strong></a>
             <span class="muted"> · ${Number(p.views || 0)} views</span>
@@ -398,49 +288,32 @@ route(/^\/@(?<username>[A-Za-z0-9_]{3,20})$/, async (el, { username }) => {
 
 route(/^\/@(?<username>[A-Za-z0-9_]{3,20})\/(?<slug>[a-z0-9\-]{1,50})$/, async (el, { username, slug }) => {
   setTitle(`${username}/${slug}`);
-  // Try server page first
-  let servedByServer = false;
-  try {
-    const url = `${API_BASE}/@${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
-    const res = await fetch(url, { method: "GET" });
-    if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
-      const html = await res.text();
-      el.innerHTML = `
-        <div class="row" style="margin-top:12px">
-          <a class="btn" data-link href="/">← Back</a>
-        </div>
-        <iframe title="${escapeHtml(slug)}" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:12px;margin-top:12px" srcdoc="${html.replaceAll('"', "&quot;")}"></iframe>
-      `;
-      servedByServer = true;
-    }
-  } catch { /* ignore */ }
-
-  if (!servedByServer) {
-    const proj = state.projects.find(p => p.username === username && p.slug === slug);
-    if (!proj) {
-      el.innerHTML = `
-        <h1>Project not found</h1>
-        <p class="muted">We couldn't find @${escapeHtml(username)}/${escapeHtml(slug)}.</p>
-        <p><a class="btn" data-link href="/">Go home</a></p>
-      `;
-      return;
-    }
-    // increment local view
-    proj.views = (proj.views || 0) + 1;
-    proj.updatedAt = new Date().toISOString();
-    saveStore();
-    el.innerHTML = `
-      <div class="row" style="margin-top:12px">
-        <a class="btn" data-link href="/">← Back</a>
-      </div>
-      <iframe title="${escapeHtml(slug)}" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:12px;margin-top:12px" srcdoc="${proj.html.replaceAll('"', "&quot;")}"></iframe>
-    `;
-  }
+  const url = `${API_BASE}/@${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
+  el.innerHTML = `
+    <div class="row" style="margin-top:12px">
+      <a class="btn" data-link href="/">← Back</a>
+    </div>
+    <iframe title="${escapeHtml(slug)}" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:12px;margin-top:12px" src="${url}"></iframe>
+  `;
 });
 
-// Boot
-loadStore();
+// Session bootstrap
+async function loadSession() {
+  try {
+    const res = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json();
+      state.currentUser = data.user;
+    } else {
+      state.currentUser = null;
+    }
+  } catch {
+    state.currentUser = null;
+  }
+}
+
 attachGlobalLinkInterceptor();
 window.addEventListener("popstate", router);
+await loadSession();
 renderNav();
 router();
