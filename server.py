@@ -170,6 +170,7 @@ def gemini_generate_html(prompt: str) -> str:
 ###############################################################################
 @app.route("/")
 def home():
+    # Render the homepage from the template with server-side project data
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -178,9 +179,25 @@ def home():
       ORDER BY views DESC, created_at DESC
       LIMIT 24
     """)
-    projects = c.fetchall()
+    rows = c.fetchall()
     conn.close()
-    return render_template("index.html", projects=projects, app_name=APP_NAME, user=current_user())
+    projects = rows
+    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects)
+
+@app.route("/api/projects")
+def api_projects():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+      SELECT username, slug, title, views, created_at
+      FROM projects
+      ORDER BY views DESC, created_at DESC
+      LIMIT 24
+    """)
+    rows = c.fetchall()
+    conn.close()
+    projects = [dict(r) for r in rows]
+    return {"projects": projects}
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
@@ -322,6 +339,13 @@ def project(username, slug):
     c.execute("UPDATE projects SET views = views + 1 WHERE id=?", (row["id"],))
     conn.commit()
     conn.close()
+
+    # Try to serve the generated file from disk
+    proj_file = PROJECTS_DIR / username / slug / "index.html"
+    if proj_file.is_file():
+        return send_from_directory(proj_file.parent, proj_file.name)
+
+    # Fallback to DB content if file is missing
     html = row["html_content"]
     return Response(html, mimetype="text/html")
 
