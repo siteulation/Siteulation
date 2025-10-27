@@ -170,8 +170,17 @@ def gemini_generate_html(prompt: str) -> str:
 ###############################################################################
 @app.route("/")
 def home():
-    # Serve the static root index.html file directly
-    return send_from_directory(BASE_DIR, "index.html")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+      SELECT username, slug, title, views, created_at
+      FROM projects
+      ORDER BY views DESC, created_at DESC
+      LIMIT 24
+    """)
+    projects = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects)
 
 @app.route("/api/projects")
 def api_projects():
@@ -354,4 +363,3 @@ def serve_project_file(subpath):
 ###############################################################################
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
-
