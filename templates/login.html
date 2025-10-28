@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Log in</h1>
+<form method="post" class="form">
+  <label>
+    <span>Username</span>
+    <input name="username" required autocomplete="username">
+  </label>
+  <label>
+    <span>Password</span>
+    <input name="password" type="password" required autocomplete="current-password">
+  </label>
+  <button class="btn" type="submit">Log in</button>
+</form>
+<p class="muted">No account? <a href="/signup">Sign up</a></p>
+{% endblock %}
+

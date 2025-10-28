@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Create your account</h1>
+<form method="post" class="form">
+  <label>
+    <span>Username</span>
+    <input name="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required autocomplete="username">
+  </label>
+  <label>
+    <span>Password</span>
+    <input name="password" type="password" minlength="6" required autocomplete="new-password">
+  </label>
+  <button class="btn" type="submit">Sign up</button>
+</form>
+<p class="muted">Already have an account? <a href="/login">Log in</a></p>
+{% endblock %}
+

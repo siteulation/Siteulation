@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>@{{ profile_user['username'] }}</h1>
+  <h2 class="sub">Projects</h2>
+  {% if projects|length == 0 %}
+    <p class="muted">No projects yet.</p>
+  {% else %}
+    <ul class="list">
+      {% for p in projects %}
+        <li>
+          <a href="/@{{ profile_user['username'] }}/{{ p['slug'] }}"><strong>{{ p['title'] }}</strong></a>
+          <span class="muted"> · {{ p['views'] }} views</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}
+
