@@ -12,7 +12,6 @@ import google.generativeai as genai
 # NEW: Postgres via psycopg
 import psycopg
 from psycopg.rows import dict_row
-from flask_cors import CORS
 
 APP_NAME = "siteulation"
 BASE_DIR = Path(__file__).parent.resolve()
@@ -24,8 +23,6 @@ DB_URL = os.environ.get("DBURL")  # Render Postgres internal URL
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = SECRET_KEY
-# Enable CORS for all endpoints with credentials (static site can call this server)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configure Gemini if available
 if GEMINI_API_KEY:
@@ -109,7 +106,7 @@ def write_project_files(username: str, slug: str, html: str):
     (proj_dir / "index.html").write_text(html, encoding="utf-8")
 
 def sanitize_slug(s: str) -> str:
-    s = s.lower().trim() if hasattr(s, "trim") else s.lower().strip()
+    s = s.lower().strip()
     s = re.sub(r"[^a-z0-9\-]+", "-", s)
     s = re.sub(r"-{2,}", "-", s).strip("-")
     return s[:50] or "site"
@@ -190,105 +187,7 @@ def home():
           LIMIT 24
         """)
         projects = [dict(r) for r in c.fetchall()]
-        c.execute("""
-          SELECT username, SUM(views) AS views, COUNT(*) AS projects
-          FROM projects
-          GROUP BY username
-          ORDER BY SUM(views) DESC NULLS LAST, COUNT(*) DESC
-          LIMIT 12
-        """)
-        popular_users = [dict(r) for r in c.fetchall()]
-    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects, popular_users=popular_users)
-
-@app.route("/api/projects")
-def api_projects():
-    conn = get_db()
-    with conn.cursor() as c:
-        c.execute("""
-          SELECT username, slug, title, views, created_at
-          FROM projects
-          ORDER BY views DESC, created_at DESC
-          LIMIT 24
-        """)
-        rows = c.fetchall()
-    projects = [dict(r) for r in rows]
-    return {"projects": projects}
-
-@app.route("/api/popular-users")
-def api_popular_users():
-    conn = get_db()
-    with conn.cursor() as c:
-        c.execute("""
-          SELECT username, SUM(views) AS views, COUNT(*) AS projects
-          FROM projects
-          GROUP BY username
-          ORDER BY SUM(views) DESC NULLS LAST, COUNT(*) DESC
-          LIMIT 12
-        """)
-        rows = c.fetchall()
-    users = [{"username": r["username"], "views": int(r["views"] or 0), "projects": int(r["projects"] or 0)} for r in rows]
-    return {"users": users}
-
-@app.route("/api/me", methods=["GET"])
-def api_me():
-    u = current_user()
-    if not u:
-        return {"user": None}
-    return {"user": {"id": u["id"], "username": u["username"]}}
-
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        if not USERNAME_RE.match(username):
-            flash("Username must be 3-20 chars (letters, numbers, underscore).", "error")
-            return redirect(url_for("signup"))
-        if len(password) < 6:
-            flash("Password must be at least 6 characters.", "error")
-            return redirect(url_for("signup"))
-        conn = get_db()
-        try:
-            with conn.cursor() as c:
-                c.execute(
-                    "INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)",
-                    (username, generate_password_hash(password), datetime.utcnow().isoformat())
-                )
-            conn.commit()
-        except psycopg.IntegrityError:
-            conn.rollback()
-            flash("Username is already taken.", "error")
-            return redirect(url_for("signup"))
-        with conn.cursor() as c:
-            c.execute("SELECT id FROM users WHERE username=%s", (username,))
-            row = c.fetchone()
-        session["user_id"] = row["id"]
-        flash("Welcome to siteulation!", "success")
-        return redirect(url_for("studio"))
-    return render_template("signup.html", app_name=APP_NAME, user=current_user())
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        conn = get_db()
-        with conn.cursor() as c:
-            c.execute("SELECT id, username, password_hash FROM users WHERE username=%s", (username,))
-            user = c.fetchone()
-        if user and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            flash("Logged in.", "success")
-            return redirect(url_for("studio"))
-        flash("Invalid credentials.", "error")
-        return redirect(url_for("login"))
-    return render_template("login.html", app_name=APP_NAME, user=current_user())
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    session.clear()
-    flash("Logged out.", "success")
-    return redirect(url_for("home"))
+    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects)
 
 @app.route("/studio")
 def studio():
@@ -389,4 +288,4 @@ def serve_project_file(subpath):
 # Run
 ###############################################################################
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
