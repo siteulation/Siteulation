@@ -190,7 +190,15 @@ def home():
           LIMIT 24
         """)
         projects = [dict(r) for r in c.fetchall()]
-    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects)
+        c.execute("""
+          SELECT username, SUM(views) AS views, COUNT(*) AS projects
+          FROM projects
+          GROUP BY username
+          ORDER BY SUM(views) DESC NULLS LAST, COUNT(*) DESC
+          LIMIT 12
+        """)
+        popular_users = [dict(r) for r in c.fetchall()]
+    return render_template("index.html", app_name=APP_NAME, user=current_user(), projects=projects, popular_users=popular_users)
 
 @app.route("/api/projects")
 def api_projects():
@@ -205,6 +213,21 @@ def api_projects():
         rows = c.fetchall()
     projects = [dict(r) for r in rows]
     return {"projects": projects}
+
+@app.route("/api/popular-users")
+def api_popular_users():
+    conn = get_db()
+    with conn.cursor() as c:
+        c.execute("""
+          SELECT username, SUM(views) AS views, COUNT(*) AS projects
+          FROM projects
+          GROUP BY username
+          ORDER BY SUM(views) DESC NULLS LAST, COUNT(*) DESC
+          LIMIT 12
+        """)
+        rows = c.fetchall()
+    users = [{"username": r["username"], "views": int(r["views"] or 0), "projects": int(r["projects"] or 0)} for r in rows]
+    return {"users": users}
 
 @app.route("/api/me", methods=["GET"])
 def api_me():
