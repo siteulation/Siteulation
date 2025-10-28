@@ -284,6 +284,55 @@ def serve_project_file(subpath):
         return send_from_directory(target.parent, target.name)
     abort(404)
 
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "GET":
+        return render_template("signup.html", app_name=APP_NAME, user=current_user())
+    username = (request.form.get("username") or "").strip()
+    password = (request.form.get("password") or "").strip()
+    if not USERNAME_RE.match(username) or len(password) < 6:
+        flash("Invalid username or password.", "error")
+        return render_template("signup.html", app_name=APP_NAME, user=current_user())
+    
+    conn = get_db()
+    try:
+        with conn.cursor() as c:
+            c.execute("INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)",
+                      (username, generate_password_hash(password), datetime.utcnow()))
+            c.execute("SELECT id FROM users WHERE username=%s", (username,))
+            row = c.fetchone()
+        conn.commit()
+        session["user_id"] = row["id"]
+        flash("Welcome! Account created.", "success")
+        return redirect(url_for("studio"))
+    except Exception:
+        conn.rollback()
+        flash("Username already exists.", "error")
+        return render_template("signup.html", app_name=APP_NAME, user=current_user())
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template("login.html", app_name=APP_NAME, user=current_user())
+    username = (request.form.get("username") or "").strip()
+    password = (request.form.get("password") or "").strip()
+    conn = get_db()
+    with conn.cursor() as c:
+        c.execute("SELECT id, username, password_hash FROM users WHERE username=%s", (username,))
+        u = c.fetchone()
+    if not u or not check_password_hash(u["password_hash"], password):
+        flash("Invalid credentials.", "error")
+        return render_template("login.html", app_name=APP_NAME, user=current_user())
+    session["user_id"] = u["id"]
+    flash("Logged in.", "success")
+    return redirect(url_for("studio"))
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("Logged out.", "success")
+    return redirect(url_for("home"))
+
 ###############################################################################
 # Run
 ###############################################################################
