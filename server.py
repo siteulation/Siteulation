@@ -1,21 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
-import google.generativeai as genai
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+app.secret_key = SECRET_KEY
 app.url_map.strict_slashes = False
 
-# Secret key for session cookies: use env if provided, else generate at runtime
-SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
-app.config["SECRET_KEY"] = SECRET_KEY
-
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
 APP_NAME = "siteulation"
-GENAI_API_KEY = os.environ.get("GOOGLE_API_KEY")
-if GENAI_API_KEY:
-    genai.configure(api_key=GENAI_API_KEY)
 
-# simple in-memory store: {(username, slug): {"title": str, "html": str, "views": int}}
-PROJECTS = {}
+PROJECTS = {}  # key: (username, slug) -> {"title": str, "html": str}
 
 def current_user():
     return session.get("user")
@@ -68,53 +61,52 @@ def api_generate():
     data = request.get_json(force=True) or {}
     title = (data.get("title") or "Untitled").strip()
     slug = (data.get("slug") or title.lower().replace(" ", "-")[:50]).strip() or "untitled"
-    user = current_user()["username"]
-    key = (user, slug)
-    if key not in PROJECTS:
-        PROJECTS[key] = {
-            "title": title,
-            "html": """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>prompt to create your site!</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet"><style>body{font-family:'Noto Sans',system-ui;max-width:800px;margin:40px auto;padding:0 16px;line-height:1.6}h1{font-size:1.8rem}</style></head><body><h1>prompt to create your site!</h1><p>Use the sidebar on the embed page to enter a prompt. Each prompt will replace this page with a newly generated site.</p></body></html>""",
-            "views": 0,
-        }
-    url = f"/@{user}/{slug}"
+    url = f"/@{current_user()['username']}/{slug}"
     return jsonify({"url": url})
 
-@app.get("/@<username>/<slug>")
-def project_embed(username, slug):
-    key = (username, slug)
-    if key not in PROJECTS:
-        return redirect(url_for("home"))
-    PROJECTS[key]["views"] += 1
-    return render_template("project_embed.html", app_name=APP_NAME, user=current_user(), project=PROJECTS[key], username=username, slug=slug)
+@app.post("/api/projects")
+def create_project():
+    if not current_user():
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(force=True) or {}
+    title = (data.get("title") or "Untitled").strip()
+    slug = (data.get("slug") or title.lower().replace(" ", "-")[:50]).strip() or "untitled"
+    key = (current_user()["username"], slug)
+    PROJECTS[key] = {"title": title, "html": "<!doctype html><html><head><meta charset='utf-8'><title>{}</title><meta name='viewport' content='width=device-width, initial-scale=1'><link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap' rel='stylesheet'><style>body{font-family:'Noto Sans',system-ui;-webkit-font-smoothing:antialiased;margin:0;padding:24px;line-height:1.6}h1{margin:0 0 12px}</style></head><body><h1>{}</h1><p class='muted'>prompt to create your site!</p></body></html>".format(title, title)}
+    return jsonify({"url": f"/@{key[0]}/{key[1]}"}), 201
 
-@app.get("/@<username>/<slug>/fullpage")
+@app.route("/@<username>/<slug>/fullpage")
 def project_fullpage(username, slug):
     key = (username, slug)
     proj = PROJECTS.get(key)
     if not proj:
-        return "<h1>Not Found</h1>", 404
-    return proj["html"], 200, {"Content-Type": "text/html; charset=utf-8"}
+        return "Not Found", 404
+    return proj["html"]
 
-@app.post("/@<username>/<slug>/prompt")
-def project_prompt(username, slug):
-    if not current_user() or current_user()["username"] != username:
-        return jsonify({"error": "Unauthorized"}), 401
+@app.route("/@<username>/<slug>", methods=["GET", "POST"])
+def project_embed(username, slug):
     key = (username, slug)
     proj = PROJECTS.get(key)
     if not proj:
-        return jsonify({"error": "Project not found"}), 404
-    data = request.get_json(force=True) or {}
-    prompt = (data.get("prompt") or "").strip()
-    if not prompt:
-        return jsonify({"error": "Prompt required"}), 400
+        return "Not Found", 404
+    if request.method == "POST":
+        prompt = (request.form.get("prompt") or "").strip()
+        if prompt:
+            html = generate_html_from_prompt(proj["title"], prompt)
+            PROJECTS[key]["html"] = html
+            flash("Page updated.", "success")
+        return redirect(f"/@{username}/{slug}")
+    return render_template("project_embed.html", app_name=APP_NAME, user=current_user(), proj=proj, username=username, slug=slug)
+
+import google.generativeai as genai
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", ""))
+def generate_html_from_prompt(title, prompt):
     try:
-        if GENAI_API_KEY:
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            resp = model.generate_content(f"Create a single, self-contained HTML file (no external JS) for this website:\n{prompt}\nRequirements:\n- Use Noto Sans.\n- Clean, simple white background.\n- No garish gradients or complex animations.\n- Include clear headings and content.\nReturn ONLY the HTML.")
-            html = resp.text or proj["html"]
-        else:
-            html = f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>{proj['title']}</title><link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap' rel='stylesheet'><style>body{{font-family:'Noto Sans',system-ui;max-width:800px;margin:40px auto;padding:0 16px;line-height:1.6}}</style></head><body><h1>{proj['title']}</h1><p>(Dev mode) Would generate for prompt:</p><pre>{prompt}</pre></body></html>"
-        PROJECTS[key]["html"] = html
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)[:200]}), 500
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        resp = model.generate_content(f"Create a single self-contained HTML file for a website titled '{title}'. Use clean styles, no external images. Implement the following:\n\n{prompt}\n\nReturn only valid HTML.")
+        html = resp.text or ""
+        if "<html" not in html:
+            html = f"<!doctype html><html><head><meta charset='utf-8'><title>{title}</title></head><body><pre>{html}</pre></body></html>"
+        return html
+    except Exception:
+        return f"<!doctype html><html><head><meta charset='utf-8'><title>{title}</title></head><body><p>Failed to generate. Try again.</p></body></html>"
