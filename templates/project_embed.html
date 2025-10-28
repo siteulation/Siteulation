@@ -1,69 +1,19 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{{ project['title'] }} — {{ app_name }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <style>
-    .layout { display:flex; min-height:100vh; }
-    .sidebar { width:320px; border-right:1px solid var(--border); padding:16px; }
-    .sidebar h2 { margin:0 0 10px; font-size:1.1rem; }
-    .content { flex:1; }
-    .content iframe { border:0; width:100%; height:100vh; }
-  </style>
-</head>
-<body>
-  <header class="site-header">
-    <div class="container row">
-      <a class="brand" href="/">siteulation</a>
-      <nav class="nav">
-        <a href="/studio">Studio</a>
-        <a href="/@{{ username }}">Profile</a>
-      </nav>
-    </div>
-  </header>
-  <div class="layout">
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ proj['title'] }}</h1>
+  <div class="project-layout">
     <aside class="sidebar">
-      <h2>Prompt this site</h2>
-      <form id="prompt-form" class="form">
+      <form method="post" class="form">
         <label>
           <span>Prompt</span>
-          <textarea name="prompt" rows="8" required placeholder="Describe changes or features you want..."></textarea>
+          <textarea name="prompt" rows="8" required placeholder="Describe changes or features to generate."></textarea>
         </label>
         <button class="btn" type="submit">Generate</button>
       </form>
-      <p class="muted">Each prompt replaces the full page.</p>
+      <p><a class="btn" href="/@{{ username }}/{{ slug }}/fullpage" target="_blank">Open full page</a></p>
     </aside>
-    <main class="content">
-      <iframe id="page-frame" src="/@{{ username }}/{{ slug }}/fullpage" title="{{ project['title'] }}"></iframe>
-    </main>
+    <section class="embed">
+      <iframe src="/@{{ username }}/{{ slug }}/fullpage" title="{{ proj['title'] }}"></iframe>
+    </section>
   </div>
-  <script type="module">
-    const form = document.getElementById('prompt-form');
-    const frame = document.getElementById('page-frame');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fd = new FormData(form);
-      const payload = { prompt: fd.get('prompt')?.toString() ?? '' };
-      form.querySelector('button[type="submit"]').disabled = true;
-      try {
-        const res = await fetch('/@{{ username }}/{{ slug }}/prompt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Generation failed'); return; }
-        frame.contentWindow.location.reload();
-      } catch (err) {
-        console.error(err); alert('Network error.');
-      } finally {
-        form.querySelector('button[type="submit"]').disabled = false;
-      }
-    });
-  </script>
-</body>
-</html>
+{% endblock %}
