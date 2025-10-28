@@ -77,13 +77,14 @@ function attachLinkHandlers(scope = document) {
 // Views
 route("/", async (el) => {
   setTitle("");
-  let projects = [];
+  let projects = []; let popular = [];
   try {
-    const res = await fetch(`${API_BASE}/api/projects`, { headers: { "Accept": "application/json" }, credentials: "include" });
-    if (res.ok) {
-      const data = await res.json();
-      projects = data.projects || [];
-    }
+    const [resP, resU] = await Promise.all([
+      fetch(`${API_BASE}/api/projects`, { headers: { "Accept": "application/json" }, credentials: "include" }),
+      fetch(`${API_BASE}/api/popular-users`, { headers: { "Accept": "application/json" }, credentials: "include" })
+    ]);
+    if (resP.ok) projects = (await resP.json()).projects || [];
+    if (resU.ok) popular = (await resU.json()).users || [];
   } catch { /* ignore */ }
   el.innerHTML = `
     <h1>Most viewed projects</h1>
@@ -103,6 +104,19 @@ route("/", async (el) => {
           </a>
         `).join("")}
       </div>
+    `}
+    <h1>Most popular users</h1>
+    ${popular.length === 0 ? `
+      <p class="muted">No users yet.</p>
+    ` : `
+      <ul class="list">
+        ${popular.map(u => `
+          <li>
+            <a data-link href="/@${encodeURIComponent(u.username)}">@${escapeHtml(u.username)}</a>
+            <span class="muted"> · ${Number(u.views||0)} views · ${Number(u.projects||0)} projects</span>
+          </li>
+        `).join("")}
+      </ul>
     `}
   `;
 });
