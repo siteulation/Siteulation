@@ -1,13 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
-# Move SECRET_KEY assignment above usage
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
+APP_NAME = "siteulation"
+
+app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = SECRET_KEY
 app.url_map.strict_slashes = False
-
-APP_NAME = "siteulation"
 
 def current_user():
     return session.get("user")
@@ -62,12 +61,3 @@ def api_generate():
     slug = (data.get("slug") or title.lower().replace(" ", "-")[:50]).strip() or "untitled"
     url = f"/@{current_user()['username']}/{slug}"
     return jsonify({"url": url})
-
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
-
-# Bind to PORT when running directly (useful for Render or local)
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port)
