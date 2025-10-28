@@ -8,6 +8,8 @@ body { margin:0; color:var(--fg); background:var(--bg); font-family:"Noto Sans",
 
 .site-header { border-bottom:1px solid var(--border); padding:12px 0; position:sticky; top:0; background:var(--bg); z-index:10; }
 .brand { font-weight:700; text-decoration:none; color:var(--fg); letter-spacing:0.2px; }
+/* ensure fullpage iframe pages look good */
+iframe { background: var(--bg); }
 .nav a { margin-left:12px; text-decoration:none; color:var(--fg); }
 .inline { display:inline; }
 
@@ -43,4 +45,3 @@ h2.sub { font-size:1rem; color:var(--muted); margin-top:-8px; }
 .site-footer { border-top:1px solid var(--border); margin-top:40px; padding:20px 0; color:var(--muted); font-size:0.95rem; }
 
 .result { margin-top:20px; }
-
