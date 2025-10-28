@@ -1,20 +1,16 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
 import google.generativeai as genai
-import hashlib
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-SECRET_KEY = os.environ.get("SECRET_KEY")
-GENAI_API_KEY = os.environ.get("GOOGLE_API_KEY")
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
-# Derive a stable secret from existing env vars if SECRET_KEY is not provided
-if not SECRET_KEY:
-    material = f"{GENAI_API_KEY or ''}|{DATABASE_URL or ''}".strip()
-    SECRET_KEY = hashlib.sha256(material.encode()).hexdigest() if material else "dev"
-app.secret_key = SECRET_KEY
 app.url_map.strict_slashes = False
 
+# Secret key for session cookies: use env if provided, else generate at runtime
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+app.config["SECRET_KEY"] = SECRET_KEY
+
 APP_NAME = "siteulation"
+GENAI_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if GENAI_API_KEY:
     genai.configure(api_key=GENAI_API_KEY)
 
