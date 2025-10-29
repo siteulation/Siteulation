@@ -6,48 +6,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev")
 APP_NAME = "siteulation"
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DBURL = os.environ.get("DBURL")
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = SECRET_KEY
 app.url_map.strict_slashes = False
 
 def get_db():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL is not set")
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
-
-def init_db():
-    with get_db() as conn, conn.cursor() as cur:
-        # Users table
-        cur.execute("""
-        create table if not exists users (
-            id serial primary key,
-            username varchar(20) unique not null,
-            password_hash text not null,
-            created_at timestamp default now()
-        );
-        """)
-        # Projects table
-        cur.execute("""
-        create table if not exists projects (
-            id serial primary key,
-            user_id int not null references users(id) on delete cascade,
-            title varchar(120) not null,
-            slug varchar(80) not null,
-            html text not null,
-            views int not null default 0,
-            created_at timestamp default now(),
-            unique(user_id, slug)
-        );
-        """)
-        # Helpful index
-        cur.execute("create index if not exists idx_projects_views on projects(views desc);")
+    if not DBURL:
+        raise RuntimeError("DBURL is not set")
+    return psycopg.connect(DBURL, row_factory=dict_row)
 
 @app.before_request
 def ensure_db():
     # Initialize once per process
-    if not getattr(app, "_db_inited", False) and DATABASE_URL:
+    if not getattr(app, "_db_inited", False) and DBURL:
         init_db()
         app._db_inited = True
 
@@ -66,8 +39,8 @@ def fetch_user_by_id(user_id):
 
 @app.get("/")
 def home():
-    if not DATABASE_URL:
-        flash("Database is not configured. Set DATABASE_URL to enable accounts and projects.", "error")
+    if not DBURL:
+        flash("Database is not configured. Set DBURL to enable accounts and projects.", "error")
         return render_template("index.html", projects=[], app_name=APP_NAME, user=current_user())
     with get_db() as conn, conn.cursor() as cur:
         cur.execute("""
@@ -82,8 +55,8 @@ def home():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if not DATABASE_URL:
-        flash("Sign up is unavailable: DATABASE_URL is not set.", "error")
+    if not DBURL:
+        flash("Sign up is unavailable: DBURL is not set.", "error")
         return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -111,8 +84,8 @@ def signup():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if not DATABASE_URL:
-        flash("Login is unavailable: DATABASE_URL is not set.", "error")
+    if not DBURL:
+        flash("Login is unavailable: DBURL is not set.", "error")
         return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -139,8 +112,8 @@ def logout():
 
 @app.get("/studio")
 def studio():
-    if not DATABASE_URL:
-        flash("Studio is unavailable: DATABASE_URL is not set.", "error")
+    if not DBURL:
+        flash("Studio is unavailable: DBURL is not set.", "error")
         return redirect(url_for("home"))
     if not current_user():
         flash("Please log in to use the Studio.", "error")
@@ -149,8 +122,8 @@ def studio():
 
 @app.post("/api/generate")
 def api_generate():
-    if not DATABASE_URL:
-        return jsonify({"error": "Service unavailable: DATABASE_URL is not set"}), 503
+    if not DBURL:
+        return jsonify({"error": "Service unavailable: DBURL is not set"}), 503
     cu = current_user()
     if not cu:
         return jsonify({"error": "Unauthorized"}), 401
@@ -215,8 +188,8 @@ def api_generate():
 
 @app.get("/@<username>")
 def profile(username):
-    if not DATABASE_URL:
-        flash("Profiles are unavailable: DATABASE_URL is not set.", "error")
+    if not DBURL:
+        flash("Profiles are unavailable: DBURL is not set.", "error")
         return render_template("profile.html", profile_user={"username": username}, projects=[], app_name=APP_NAME, user=current_user()), 200
     user_row = fetch_user_by_username(username)
     if not user_row:
@@ -233,7 +206,7 @@ def profile(username):
 
 @app.get("/@<username>/<slug>")
 def view_project(username, slug):
-    if not DATABASE_URL:
+    if not DBURL:
         return render_template("404.html"), 404
     user_row = fetch_user_by_username(username)
     if not user_row:
