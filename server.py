@@ -47,7 +47,7 @@ def init_db():
 @app.before_request
 def ensure_db():
     # Initialize once per process
-    if not getattr(app, "_db_inited", False):
+    if not getattr(app, "_db_inited", False) and DATABASE_URL:
         init_db()
         app._db_inited = True
 
@@ -66,6 +66,9 @@ def fetch_user_by_id(user_id):
 
 @app.get("/")
 def home():
+    if not DATABASE_URL:
+        flash("Database is not configured. Set DATABASE_URL to enable accounts and projects.", "error")
+        return render_template("index.html", projects=[], app_name=APP_NAME, user=current_user())
     with get_db() as conn, conn.cursor() as cur:
         cur.execute("""
         select p.title, p.slug, p.views, u.username
@@ -79,6 +82,9 @@ def home():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
+    if not DATABASE_URL:
+        flash("Sign up is unavailable: DATABASE_URL is not set.", "error")
+        return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -105,6 +111,9 @@ def signup():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if not DATABASE_URL:
+        flash("Login is unavailable: DATABASE_URL is not set.", "error")
+        return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -130,6 +139,9 @@ def logout():
 
 @app.get("/studio")
 def studio():
+    if not DATABASE_URL:
+        flash("Studio is unavailable: DATABASE_URL is not set.", "error")
+        return redirect(url_for("home"))
     if not current_user():
         flash("Please log in to use the Studio.", "error")
         return redirect(url_for("login"))
@@ -137,6 +149,8 @@ def studio():
 
 @app.post("/api/generate")
 def api_generate():
+    if not DATABASE_URL:
+        return jsonify({"error": "Service unavailable: DATABASE_URL is not set"}), 503
     cu = current_user()
     if not cu:
         return jsonify({"error": "Unauthorized"}), 401
@@ -201,6 +215,9 @@ def api_generate():
 
 @app.get("/@<username>")
 def profile(username):
+    if not DATABASE_URL:
+        flash("Profiles are unavailable: DATABASE_URL is not set.", "error")
+        return render_template("profile.html", profile_user={"username": username}, projects=[], app_name=APP_NAME, user=current_user()), 200
     user_row = fetch_user_by_username(username)
     if not user_row:
         return render_template("profile.html", profile_user={"username": username}, projects=[], app_name=APP_NAME, user=current_user()), 200
@@ -216,6 +233,8 @@ def profile(username):
 
 @app.get("/@<username>/<slug>")
 def view_project(username, slug):
+    if not DATABASE_URL:
+        return render_template("404.html"), 404
     user_row = fetch_user_by_username(username)
     if not user_row:
         return render_template("404.html"), 404
