@@ -8,55 +8,14 @@ from datetime import datetime, timedelta
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Environment variables - validate they exist
+# Environment variables
 DATABASE_URL = os.getenv('DATABASE_URL')
 DATABASE_KEY = os.getenv('DATABASE_KEY')
 GEMINI_API_KEY = os.getenv('APIKEY')
 
-# Validate required environment variables
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required")
-if not DATABASE_KEY:
-    raise ValueError("DATABASE_KEY environment variable is required")
-if not GEMINI_API_KEY:
-    raise ValueError("APIKEY environment variable is required")
-
-print(f"Initializing with DATABASE_URL: {DATABASE_URL[:30]}...")  # Print first 30 chars for debugging
-
 # Initialize Supabase client
-try:
-    supabase: Client = create_client(DATABASE_URL, DATABASE_KEY)
-    print("Supabase client initialized successfully")
-except Exception as e:
-    print(f"Failed to initialize Supabase client: {e}")
-    raise
-
+supabase: Client = create_client(DATABASE_URL, DATABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-
-# Initialize database tables
-def init_tables():
-    try:
-        # Check if tables exist, if not they should be created via Supabase dashboard
-        # We'll just verify we can connect
-        supabase.table('users').select('id').limit(1).execute()
-        print("Database tables verified")
-    except Exception as e:
-        print(f"Warning: Could not verify tables - {e}")
-        print("Please ensure the following tables exist in your Supabase database:")
-        print("- users (id uuid, email text, tokens int, last_token_refill timestamp)")
-        print("- carts (id uuid, owner_id uuid, name text, created_at timestamp, pinned_version int)")
-        print("- versions (id uuid, cart_id uuid, version_number int, content text, created_at timestamp)")
-
-init_tables()
-
-@app.route('/health')
-def health():
-    return jsonify({
-        'status': 'ok',
-        'database_url_set': bool(DATABASE_URL),
-        'database_key_set': bool(DATABASE_KEY),
-        'gemini_key_set': bool(GEMINI_API_KEY)
-    })
 
 @app.route('/')
 def index():
