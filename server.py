@@ -8,18 +8,39 @@ from datetime import datetime, timedelta
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Get environment variables
+# Environment variables - validate they exist
 DATABASE_URL = os.getenv('DATABASE_URL')
 DATABASE_KEY = os.getenv('DATABASE_KEY')
 GEMINI_API_KEY = os.getenv('APIKEY')
 
-# Validate environment variables
-if not all([DATABASE_URL, DATABASE_KEY, GEMINI_API_KEY]):
-    raise ValueError("Missing required environment variables: DATABASE_URL, DATABASE_KEY, APIKEY")
+# Validate required environment variables
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
+if not DATABASE_KEY:
+    raise ValueError("DATABASE_KEY environment variable is required")
+if not GEMINI_API_KEY:
+    raise ValueError("APIKEY environment variable is required")
 
-# Initialize Supabase client (not direct psycopg connection)
-supabase: Client = create_client(DATABASE_URL, DATABASE_KEY)
+print(f"Initializing with DATABASE_URL: {DATABASE_URL[:30]}...")  # Print first 30 chars for debugging
+
+# Initialize Supabase client
+try:
+    supabase: Client = create_client(DATABASE_URL, DATABASE_KEY)
+    print("Supabase client initialized successfully")
+except Exception as e:
+    print(f"Failed to initialize Supabase client: {e}")
+    raise
+
 genai.configure(api_key=GEMINI_API_KEY)
+
+@app.route('/health')
+def health():
+    return jsonify({
+        'status': 'ok',
+        'database_url_set': bool(DATABASE_URL),
+        'database_key_set': bool(DATABASE_KEY),
+        'gemini_key_set': bool(GEMINI_API_KEY)
+    })
 
 @app.route('/')
 def index():
