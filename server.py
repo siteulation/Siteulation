@@ -33,6 +33,22 @@ except Exception as e:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Initialize database tables
+def init_tables():
+    try:
+        # Check if tables exist, if not they should be created via Supabase dashboard
+        # We'll just verify we can connect
+        supabase.table('users').select('id').limit(1).execute()
+        print("Database tables verified")
+    except Exception as e:
+        print(f"Warning: Could not verify tables - {e}")
+        print("Please ensure the following tables exist in your Supabase database:")
+        print("- users (id uuid, email text, tokens int, last_token_refill timestamp)")
+        print("- carts (id uuid, owner_id uuid, name text, created_at timestamp, pinned_version int)")
+        print("- versions (id uuid, cart_id uuid, version_number int, content text, created_at timestamp)")
+
+init_tables()
+
 @app.route('/health')
 def health():
     return jsonify({
