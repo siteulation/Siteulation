@@ -9,9 +9,9 @@ import json
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Environment variables
-SUPABASE_URL = os.getenv('DBURL')
-SUPABASE_KEY = os.getenv('DBKEY')
+# Environment variables: DBURL, DBKEY, APIKEY
+SUPABASE_URL = os.getenv('DATABASE_URL')
+SUPABASE_KEY = os.getenv('DATABASE_KEY')
 GEMINI_API_KEY = os.getenv('APIKEY')
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
