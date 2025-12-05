@@ -38,12 +38,11 @@ def login():
         })
         
         user_id = response.user.id
-        user_data = supabase.table('users').select('*').eq('id', user_id).execute()
+        user_data = supabase.table('user_data').select('*').eq('user_id', user_id).execute()
         
         if not user_data.data:
-            supabase.table('users').insert({
-                'id': user_id,
-                'email': email,
+            supabase.table('user_data').insert({
+                'user_id': user_id,
                 'tokens': 16,
                 'last_token_refill': datetime.now().isoformat()
             }).execute()
@@ -54,10 +53,10 @@ def login():
             
             if datetime.now() - last_refill >= timedelta(days=1):
                 tokens += 16
-                supabase.table('users').update({
+                supabase.table('user_data').update({
                     'tokens': tokens,
                     'last_token_refill': datetime.now().isoformat()
-                }).eq('id', user_id).execute()
+                }).eq('user_id', user_id).execute()
         
         return jsonify({
             'success': True,
@@ -82,9 +81,8 @@ def signup():
         })
         
         user_id = response.user.id
-        supabase.table('users').insert({
-            'id': user_id,
-            'email': email,
+        supabase.table('user_data').insert({
+            'user_id': user_id,
             'tokens': 16,
             'last_token_refill': datetime.now().isoformat()
         }).execute()
@@ -103,7 +101,7 @@ def signup():
 def get_tokens():
     user_id = request.headers.get('X-User-Id')
     
-    user_data = supabase.table('users').select('*').eq('id', user_id).execute()
+    user_data = supabase.table('user_data').select('*').eq('user_id', user_id).execute()
     if not user_data.data:
         return jsonify({'error': 'User not found'}), 404
     
@@ -112,16 +110,25 @@ def get_tokens():
     
     if datetime.now() - last_refill >= timedelta(days=1):
         tokens += 16
-        supabase.table('users').update({
+        supabase.table('user_data').update({
             'tokens': tokens,
             'last_token_refill': datetime.now().isoformat()
-        }).eq('id', user_id).execute()
+        }).eq('user_id', user_id).execute()
     
     return jsonify({'tokens': tokens})
 
 @app.route('/api/carts/recent', methods=['GET'])
 def get_recent_carts():
-    carts = supabase.table('carts').select('*, users(email)').order('created_at', desc=True).limit(20).execute()
+    carts = supabase.table('carts').select('*').order('created_at', desc=True).limit(20).execute()
+    
+    # Get user emails from auth
+    for cart in carts.data:
+        try:
+            user = supabase.auth.admin.get_user_by_id(cart['owner_id'])
+            cart['owner_email'] = user.user.email if user else 'Unknown'
+        except:
+            cart['owner_email'] = 'Unknown'
+    
     return jsonify(carts.data)
 
 @app.route('/api/cart/<cart_id>', methods=['GET'])
@@ -203,7 +210,7 @@ def generate_version(cart_id):
         return jsonify({'error': 'Not authorized'}), 403
     
     token_cost = 2 if model_type == 'flash' else 4
-    user_data = supabase.table('users').select('*').eq('id', user_id).execute()
+    user_data = supabase.table('user_data').select('*').eq('user_id', user_id).execute()
     
     if user_data.data[0]['tokens'] < token_cost:
         return jsonify({'error': 'Insufficient tokens'}), 400
@@ -237,7 +244,7 @@ def generate_version(cart_id):
     }).execute()
     
     new_tokens = user_data.data[0]['tokens'] - token_cost
-    supabase.table('users').update({'tokens': new_tokens}).eq('id', user_id).execute()
+    supabase.table('user_data').update({'tokens': new_tokens}).eq('user_id', user_id).execute()
     
     return jsonify({
         'success': True,
