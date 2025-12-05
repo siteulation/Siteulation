@@ -46,7 +46,7 @@ async function loadRecentCarts() {
         card.className = 'cart-card';
         card.innerHTML = `
             <h4>${cart.name}</h4>
-            <p>by ${cart.users?.email || 'Unknown'}</p>
+            <p>by ${cart.owner_email || 'Unknown'}</p>
             <p>${new Date(cart.created_at).toLocaleDateString()}</p>
         `;
         card.onclick = () => {
