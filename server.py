@@ -4,17 +4,21 @@ from supabase import create_client, Client
 import google.generativeai as genai
 import os
 from datetime import datetime, timedelta
-import json
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Environment variables: DBURL, DBKEY, APIKEY
-SUPABASE_URL = os.getenv('DATABASE_URL')
-SUPABASE_KEY = os.getenv('DATABASE_KEY')
+# Get environment variables
+DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_KEY = os.getenv('DATABASE_KEY')
 GEMINI_API_KEY = os.getenv('APIKEY')
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Validate environment variables
+if not all([DATABASE_URL, DATABASE_KEY, GEMINI_API_KEY]):
+    raise ValueError("Missing required environment variables: DATABASE_URL, DATABASE_KEY, APIKEY")
+
+# Initialize Supabase client (not direct psycopg connection)
+supabase: Client = create_client(DATABASE_URL, DATABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
 
 @app.route('/')
