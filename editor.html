@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit - Siteulation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="editor-body">
+    <div class="editor-layout">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2 id="cart-name">Loading...</h2>
+                <span id="editor-tokens"></span>
+            </div>
+
+            <div class="version-selector">
+                <label>Version:</label>
+                <select id="version-select"></select>
+                <button id="pin-btn" class="btn">Pin</button>
+            </div>
+
+            <div class="ai-section">
+                <h3>Generate with AI</h3>
+                <textarea id="prompt" placeholder="Describe what you want to change..."></textarea>
+                
+                <div class="model-select">
+                    <label>
+                        <input type="radio" name="model" value="flash" checked>
+                        Flash (2 tokens)
+                    </label>
+                    <label>
+                        <input type="radio" name="model" value="pro">
+                        Pro (4 tokens)
+                    </label>
+                </div>
+
+                <button id="generate-btn" class="btn btn-primary">Generate</button>
+            </div>
+
+            <div class="version-history">
+                <h3>Version History</h3>
+                <div id="history-list"></div>
+            </div>
+
+            <div class="actions">
+                <button id="back-home" class="btn">← Back to Home</button>
+            </div>
+        </div>
+
+        <div class="preview-area">
+            <iframe id="preview-frame"></iframe>
+        </div>
+    </div>
+
+    <script type="module" src="editor.js"></script>
+</body>
+</html>
+

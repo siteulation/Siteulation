@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siteulation - AI Website Builder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <h1 class="logo">Siteulation</h1>
+            <div id="auth-section">
+                <button id="login-btn" class="btn">Login</button>
+                <button id="signup-btn" class="btn btn-primary">Sign Up</button>
+            </div>
+            <div id="user-section" style="display: none;">
+                <span id="token-display"></span>
+                <button id="new-cart-btn" class="btn btn-primary">New Cart</button>
+                <button id="logout-btn" class="btn">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="hero">
+            <h2>Build Websites with AI</h2>
+            <p>Create, edit, and version control your web projects with the power of Gemini AI</p>
+        </section>
+
+        <section class="recent-carts">
+            <h3>Recent Carts</h3>
+            <div id="carts-grid"></div>
+        </section>
+    </main>
+
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modal-title">Login</h2>
+            <form id="auth-form">
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
+
