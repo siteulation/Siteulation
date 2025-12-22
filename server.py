@@ -80,20 +80,24 @@ def signup():
             "password": password
         })
         
-        user_id = response.user.id
-        supabase.table('user_data').insert({
-            'user_id': user_id,
-            'tokens': 16,
-            'last_token_refill': datetime.now().isoformat()
-        }).execute()
-        
-        return jsonify({
-            'success': True,
-            'user_id': user_id,
-            'email': email,
-            'tokens': 16,
-            'access_token': response.session.access_token
-        })
+        # FIX: Check if we have a session.
+        # If email verification is ON, response.session will be None.
+        if response.session:
+            # This block only runs if you TURN OFF email verification
+            return jsonify({
+                'success': True,
+                'access_token': response.session.access_token,
+                'user_id': response.user.id
+            })
+        else:
+            # This block runs when email verification is ON
+            # We return success, but NO token.
+            return jsonify({
+                'success': True,
+                'message': 'Confirmation email sent. Please check your inbox.',
+                'access_token': None  # The frontend needs to handle this!
+            })
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
